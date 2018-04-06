@@ -1,15 +1,80 @@
-void CANtoSerialMonitor(){
+void NMTcontroll(){
+  if (CANmessageID == 0) {
+    if ((buf[1] == 0) || (buf[1] == CANnodeID)){
+      if (HBstatus == 127) {
+        Serial.println("From Pre-Operational");
+        if ((buf[0] == 129) || (buf[0] == 130)) {
+          Serial.println("To Reset");
+          HBstatus = 0;
+          Reset();
+        } 
+        else if (buf[0] == 1){
+          Serial.println("To Operational");
+          HBstatus = 5;
+        } 
+        else if (buf[0] == 2){
+          Serial.println("To Stop");
+          HBstatus = 4;
+        }
+      } 
+      else if (HBstatus == 4){
+        Serial.println("From Stoped");
+        if ((buf[0] == 129) || (buf[0] == 130)) { 
+          Serial.println("To Reset");
+          HBstatus = 0;
+          Reset();
+        } 
+        else if (buf[0] == 1){ 
+          Serial.println("To Operational");
+          HBstatus = 5;
+        } 
+        else if (buf[0] == 128){ 
+          Serial.println("To Pre-operational");
+          HBstatus = 127;
+        }
+      }
+      else if (HBstatus == 5){
+        Serial.println("From Operational");
+        if ((buf[0] == 129) || (buf[0] == 130)) {
+          Serial.println("To Reset");
+          HBstatus = 0;
+          Reset();
+        }
+        else if (buf[0] == 2){
+          Serial.println("To Stop");
+          HBstatus = 4;
+        } 
+        else if (buf[0] == 128){
+          Serial.println("To Pre-operational");
+          HBstatus = 127;
+        }
+      }  
+    }
+  }
+}
+
+void HBresponse(){
+  if (HBflag == 1) {
+    byte stmp[8]={HBstatus};
+    CAN.sendMsgBuf(0x700+CANnodeID, 0, 1, stmp); //pouze jeden byte - state
+    HBflag = 0;
+  }
+}
+
+void CANmsgToSerial(){
+      Serial.println("-----------------------------------------");
       Serial.print("can address: ");
-      Serial.println(address);
-      Serial.print("lenght: ");
+      Serial.print(CANmessageID);
+      Serial.print("; lenght: ");
       Serial.println(len);
       for (int i=0;i<len;i++){
         Serial.print(buf[i]);
         Serial.print("\t");
       }
       Serial.println("");
-      Serial.println("");
+      Serial.println("-----------------------------------------");
 }
+
 
 /*------------------------ setup watchdogu -----------------------------------------*/
 
@@ -27,25 +92,6 @@ void WatchDog()
 
 ISR( WDT_vect ) {
   MCUSR &= ~(1 << WDRF);// reset watch dog
-  Serial.println("  wd");
-  //int pom = 33;
-  //String pom2 = decToHex(pom,2);
- // Serial.println(pom2);
-  
-//  CAN.sendMsgBuf(0x700+CANnodeID, 0, 1, CANstatus); //pouze jeden byte - state
-}
-//------------------------------------------------------------------------------------------------
-// Converting from Decimal to Hex:
-
-// NOTE: This function can handle a positive decimal value from 0 - 255, and it will pad it
-//       with 0's (on the left) if it is less than the desired string length.
-//       For larger/longer values, change "byte" to "unsigned int" or "long" for the decValue parameter.
-
-
-String decToHex(byte decValue, byte desiredStringLength) {
-  
-  String hexString = String(decValue, HEX);
-  while (hexString.length() < desiredStringLength) hexString = "0" + hexString;
-  
-  return hexString;
+  Serial.println(HBstatus);
+  HBflag = 1;
 }
